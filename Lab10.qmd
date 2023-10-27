@@ -1,0 +1,257 @@
+---
+title: "Lab 10"
+author: "Shirley Li"
+format:
+  html:
+    embed-resources: true
+---
+
+## Setup 
+
+```{r}
+# install.packages(c("RSQLite", "DBI"))
+library(RSQLite)
+library(DBI)
+
+# Initialize a temporary in memory database
+con <- dbConnect(SQLite(), ":memory:")
+
+# Download tables
+actor <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/actor.csv")
+rental <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/rental.csv")
+customer <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/customer.csv")
+payment <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/payment_p2007_01.csv")
+
+# Copy data.frames to database
+dbWriteTable(con, "actor", actor)
+dbWriteTable(con, "rental", rental)
+dbWriteTable(con, "customer", customer)
+dbWriteTable(con, "payment", payment)
+```
+
+```{r}
+dbListTables(con)
+```
+
+## Ex 1 
+
+```{r}
+#Edit the code below to retrieve the actor ID, first name and last name for all actors using the actor table. Sort by last name and then by first name (note that the code chunk below is set up to run SQL code rather than R code).
+
+query <- "
+SELECT actor_id, last_name, first_name
+FROM actor 
+ORDER BY last_name, first_name"
+
+names <- dbGetQuery(con, query)
+
+head(names)
+```
+
+## Ex 2
+
+```{r}
+#Retrieve the actor ID, first name, and last name for actors whose last name equals ‘WILLIAMS’ or ‘DAVIS’.
+
+query <- "
+SELECT actor_id, last_name, first_name 
+FROM actor 
+WHERE last_name IN ('WILLIAMS', 'DAVIS')"
+
+william_davis <- dbGetQuery(con, query)
+
+head(william_davis)
+```
+
+## Ex 3
+
+```{r}
+#Write a query against the rental table that returns the IDs of the customers who rented a film on July 5, 2005 (use the rental.rental_date column, and you can use the date() function to ignore the time component). Include a single row for each distinct customer ID.
+
+query <- "
+SELECT DISTINCT customer_id
+FROM rental
+WHERE date(rental_date) = '2005-07-05'"
+
+rent_07052005 <- dbGetQuery(con, query)
+
+head(rent_07052005)
+```
+
+## Ex 4
+
+### 4.1 
+
+```{r}
+#Construct a query that retrieves all rows from the payment table where the amount is either 1.99, 7.99, 9.99.
+
+query <- "
+SELECT *
+FROM payment
+WHERE amount IN (1.99, 7.99, 9.99)"
+
+amount <- dbGetQuery(con, query)
+
+head(amount)
+```
+
+### 4.2
+
+```{r}
+#Construct a query that retrieves all rows from the payment table where the amount is greater then 5.
+
+query <- "
+SELECT *
+FROM payment
+WHERE amount >5"
+
+amount5 <- dbGetQuery(con, query)
+
+head(amount5)
+```
+
+### 4.3
+
+```{r}
+#Construct a query that retrieves all rows from the payment table where the amount is greater then 5 and less then 8.
+
+query <- "
+SELECT *
+FROM payment
+WHERE amount >5 AND amount <8"
+
+amount5_8 <- dbGetQuery(con, query)
+
+head(amount5_8)
+```
+
+## Ex 5 
+
+```{r}
+#Retrieve all the payment IDs and their amounts from the customers whose last name is ‘DAVIS’.
+
+query <- "
+SELECT p.payment_id, p.amount
+FROM payment p
+  INNER JOIN customer c
+WHERE p.customer_id = c.customer_id
+AND c.last_name = 'DAVIS'"
+
+davis <- dbGetQuery(con, query)
+
+davis
+```
+
+## Ex 6 
+
+### 6.1 
+
+```{r}
+#Use COUNT(*) to count the number of rows in rental.
+
+query <- "
+SELECT COUNT(*) 
+FROM rental"
+
+count <- dbGetQuery(con, query)
+
+count
+```
+
+### 6.2 
+
+```{r}
+#Use COUNT(*) and GROUP BY to count the number of rentals for each customer_id.
+
+query <- "
+SELECT COUNT(*) 
+FROM rental
+GROUP BY customer_id"
+
+count_id <- dbGetQuery(con, query)
+
+head(count_id)
+```
+
+### 6.3 
+
+```{r}
+#descending order
+
+query <- "
+SELECT COUNT(*)
+AS count 
+FROM rental
+GROUP BY customer_id
+ORDER BY count DESC"
+
+count_desc <- dbGetQuery(con, query)
+
+head(count_desc)
+```
+
+### 6.4
+
+```{r}
+#Repeat the previous query but use HAVING to only keep the groups with 40 or more.
+
+query <- "
+SELECT COUNT(*)
+AS count 
+FROM rental
+GROUP BY customer_id
+HAVING count >=40
+ORDER BY count DESC"
+
+count_desc40 <- dbGetQuery(con, query)
+
+count_desc40
+```
+
+## Ex 7
+
+### 7.1 
+
+```{r}
+#Modify the query to do those calculations for each customer_id.
+
+query <- "
+SELECT 
+    MAX(amount) AS max_amount,
+    MIN(amount) AS min_amount,
+    AVG(amount) AS avg_amount,
+    SUM(amount) AS total_amount
+FROM payment
+GROUP BY customer_id"
+
+summary_customer <- dbGetQuery(con, query)
+
+head(summary_customer)
+```
+
+### 7.2 
+
+```{r}
+#Modify the above query to only keep the customer_ids that have more then 5 payments.
+
+query <- "
+SELECT 
+    MAX(amount) AS max_amount,
+    MIN(amount) AS min_amount,
+    AVG(amount) AS avg_amount,
+    SUM(amount) AS total_amount
+FROM payment
+GROUP BY customer_id
+HAVING COUNT(*) > 5"
+
+summary_customer5 <- dbGetQuery(con, query)
+
+summary_customer5 
+```
+
+## Cleanup
+
+```{r}
+# clean up
+dbDisconnect(con)
+```
